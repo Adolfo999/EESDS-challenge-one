@@ -1,0 +1,105 @@
+##%######################################################%##
+#                                                          #
+##              CHALLENGE 1 - DATA WRANGLING              ##
+##                                                        ##
+#             CURLEY UK POPULATION FLUCTUATION             #
+#                                                          #
+##                                                        ##
+##          Adolfo San Miguel (s1951715@ed.ac.uk)         ##
+#                                                          #
+##%######################################################%##
+
+## Packages ----
+
+# I first intstall necessary packages 
+install.packages("tidyverse")  
+install.packages("ggthemes")
+install.packages("ggpubr")
+
+# I then load packages 
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(ggthemes)
+library(ggpubr)
+
+
+## DATA ----
+
+# First I load the data
+LPI_birds <- read.csv("challenge_1_data/LPI_birds.csv", header = TRUE, stringsAsFactors = TRUE) 
+site_coords <- read.csv("challenge_1_data/site_coords.csv")
+
+# I then explore the datasets 
+# This is what each function does:
+# -'head()' shows first few rows in dataset
+# - 'summary()' shows a summary statistic for each of the variables in the data frame
+# - 'str()' shows the structure of the dataset we have imported 
+head(LPI_birds) 
+head(site_coords)
+summary(LPI_birds)
+summary (site_coords)
+str(LPI_birds) 
+str(site_coords)
+
+
+## REFORMATING DATA  ----
+
+# First I reshape data into long form 
+LPI_long <- gather(LPI_data, year, population, c(25:69))
+
+# Then I combine both data sets - using coordinates to map sampling sites 
+sampling_sites <- left_join(LPI_birds_long, site_coords, by = "id") %>% 
+  select(-X) # This remove unnecessary column
+
+# Then I modify the variables within the LPI dataset: creating useful variables/deleting ones 
+# we do not need
+# Here I:
+# - Create a species type variable by using species name
+# - Merge species type with population ID number 
+# - Create columns for the earliest and latest years where data was collected
+# - Made sure data we use comes from populatinos monitored for over 5 years  
+LPI_birds_long <- LPI_birds_long %>%  #
+  unite(species_type, Genus, Species, sep = "", remove = FALSE) %>%  
+  unite(species_type_id, species_type, id, sep = "#", remove = FALSE) %>% 
+  mutate(maxyear = max(year), minyear = min(year), sampling_time = maxyear - minyear) %>% 
+  mutate(scaledpop = (population-min(population))/(max(population)-min(population))) %>% 
+  filter(is.finite(scaledpop)) %>%  
+  filter(sampling_time > 5) %>% 
+  
+# Selecting relavant information  ----
+# To do this we first have to: 
+# - Select the species we are interested in (Numenius Arquata) that habee 
+Bird <- sampling_sites %>% filter(species_type =="Numenius arquata", 
+                                    Country.list == "United Kingdom", sampling_time > 15)
+
+
+# DATA VISUALIZATION ----
+
+#First I plot trends in Curlew population overtime 
+curlew_population_trends <- ggplot(LPI_long, aes(x=year, y=scalepop)) +
+  geom_line(colour = "#3ceade") +
+  geom_point() +
+  labs(title = "Trends in Curlew population in the UK", x = "Year", y = "Normalised population size") +
+  theme(plot.title = element_text(size = 10, hjust = 0.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()))
+
+# Then I plot the location of the populations 
+(curlew_locations <- ggplot(sampling_sites, aes(x = Decimal.Longitude, y = Decimal.Latitude, colour = "red")) + 
+    borders("world", colour = "gray40", fill = "green4", size = 0.3) +
+    coord_cartesian(xlim = c(-10, 04), ylim = c(50, 65)) +
+    theme_map() +
+    geom_point(size=4) +
+    theme(legend.position="none") 
+    theme(plot.title=element_text(size=8, hjust=0.5)) +
+    labs(title="Curley population map UK"))
+
+# Finally I make and save a pannel containing both graphs 
+graph_panel <- ggarrange(curlew_population_trends, curlew_locations)
+ggsave(curlew_panel, 
+       filename = "figures/curlew_panel.png", 
+       device = "png", 
+       height = 20, 
+       width = 28, 
+       units = "cm")
